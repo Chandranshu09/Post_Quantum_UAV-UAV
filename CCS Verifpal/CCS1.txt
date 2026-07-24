@@ -1,0 +1,50 @@
+attacker[active]
+
+// Authentication of A's ML-KEM public key followed by
+// symbolic ML-KEM encapsulation and decapsulation.
+
+principal A[
+    knows public sid0
+
+    knows private sk_ots_a
+    pk_ots_a = G^sk_ots_a
+
+    generates dk_a
+    ek_a = G^dk_a
+
+    m2_a = HASH(sid0, ek_a)
+    sigma_a = SIGN(sk_ots_a, m2_a)
+]
+
+principal B[
+    knows public sid0
+]
+
+// pk_ots_a is authenticated through the ledger/LMS
+// certificate-validation layer.
+A -> B: [pk_ots_a]
+
+// Runtime values remain attacker-mutable.
+A -> B: ek_a, sigma_a
+
+principal B[
+    m2_b = HASH(sid0, ek_a)
+
+    // Explicit runtime LM-OTS verification.
+    _ = SIGNVERIF(pk_ots_a, m2_b, sigma_a)?
+
+    // ML-KEM encapsulation abstraction.
+    generates ss
+    ct_b = PKE_ENC(ek_a, ss)
+]
+
+B -> A: ct_b
+
+principal A[
+    // ML-KEM decapsulation abstraction.
+    ss_a = PKE_DEC(dk_a, ct_b)
+]
+
+queries[
+    confidentiality? ss
+]

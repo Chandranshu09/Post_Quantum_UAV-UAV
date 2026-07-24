@@ -1,0 +1,83 @@
+attacker[active]
+
+// ============================================================
+// Model 5A:
+// Repository-assisted validation of an LM-OTS public key.
+//
+// root_a is authenticated through the permissioned ledger.
+//
+// pk_ots_a, qa, and path_a are obtained from an untrusted
+// public repository and remain attacker-mutable.
+//
+// The height-10 LMS computation is represented by one checked
+// hash-path relation to avoid symbolic state expansion.
+// ============================================================
+
+principal Gss[
+    knows public ida
+    knows public va
+
+    // Public LM-OTS verification value enrolled for A.
+    generates pk_ots_a
+
+    // Enrolled one-time credential index.
+    generates qa
+
+    // Compact abstraction of the ten LMS sibling nodes.
+    generates path_a
+
+    // L_A,v,q = H(ID_A || v_A || q_A || K_A,v,q)
+    leaf_a = HASH(ida, va, qa, pk_ots_a)
+
+    // Compact abstraction of the height-10 LMS root.
+    root_a = HASH(leaf_a, path_a)
+]
+
+principal Repository[
+]
+
+principal B[
+    knows public ida
+    knows public va
+]
+
+principal Sink[
+    knows public sink_tag
+]
+
+// The ledger root is authenticated and cannot be substituted.
+Gss -> B: [root_a]
+
+// Public credential data are placed in the repository.
+Gss -> Repository: pk_ots_a, qa, path_a
+
+// The repository is untrusted. All returned values may be
+// observed, modified, replayed, or replaced by the attacker.
+Repository -> B: pk_ots_a, qa, path_a
+
+principal B[
+    // Reconstruct the credential leaf.
+    leaf_a_b = HASH(ida, va, qa, pk_ots_a)
+
+    // Verify the repository path against the authenticated root.
+    _ = ASSERT(root_a, HASH(leaf_a_b, path_a))?
+
+    // This event is reached only after successful root matching.
+    generates repository_key_marker
+    repository_key_accepted = HASH(repository_key_marker)
+]
+
+B -> Sink: [repository_key_accepted]
+
+principal Sink[
+    use_repository_key_accepted =
+        HASH(repository_key_accepted)
+]
+
+queries[
+    authentication? Gss -> B: root_a[
+        precondition[
+            B -> Sink: repository_key_accepted
+        ]
+    ]
+]

@@ -1,0 +1,99 @@
+attacker[active]
+
+// ============================================================
+// Model 2:
+// Authentication of B's ML-KEM ciphertext.
+//
+// Assumptions:
+// - enrollment is secure;
+// - pk_ots_b has been authenticated through the ledger/LMS
+//   certificate-validation layer;
+// - sid0 and ek_a are authenticated outputs of the preceding
+//   initiator-authentication stage.
+//
+// Explicitly verified:
+// - B generates ct_b by encapsulating to ek_a;
+// - B signs a context containing sid0, H(M2), and ct_b;
+// - A verifies B's signature before decapsulation;
+// - the resulting ML-KEM secret remains confidential.
+// ============================================================
+
+principal A[
+    knows public resp_tag
+
+    // Fresh session identifier abstraction.
+    generates sid0
+
+    // Ephemeral ML-KEM key pair.
+    generates dk_a
+    ek_a = G^dk_a
+
+    // Compact authenticated M2 reference.
+    m2_ref_a = HASH(sid0, ek_a)
+]
+
+principal B[
+    knows public resp_tag
+
+    // PUF-derived LM-OTS credential of B.
+    knows private sk_ots_b
+    pk_ots_b = G^sk_ots_b
+]
+
+principal Sink[
+    knows public sink_tag
+]
+
+// pk_ots_b is authenticated by the ledger/LMS layer.
+//
+// sid0 and ek_a represent the authenticated outputs of the
+// preceding M2 verification stage.
+B -> A: [pk_ots_b]
+A -> B: [sid0], [ek_a]
+
+principal B[
+    // Reconstruct the authenticated M2 reference.
+    m2_ref_b = HASH(sid0, ek_a)
+
+    // ML-KEM encapsulation abstraction.
+    generates ss
+    ct_b = PKE_ENC(ek_a, ss)
+
+    // mu_B binds the response ciphertext to SID0 and H(M2).
+    resp_ctx_b = HASH(resp_tag, sid0, m2_ref_b, ct_b)
+
+    // LM-OTS signature abstraction.
+    sigma_b = SIGN(sk_ots_b, resp_ctx_b)
+]
+
+// Runtime M3 fields remain attacker-mutable.
+B -> A: ct_b, sigma_b
+
+principal A[
+    // Reconstruct B's expected response context.
+    resp_ctx_a = HASH(resp_tag, sid0, m2_ref_a, ct_b)
+
+    // Authenticate B and bind ct_b to the current M2.
+    _ = SIGNVERIF(pk_ots_b, resp_ctx_a, sigma_b)?
+
+    // Decapsulate only after responder authentication.
+    ss_a = PKE_DEC(dk_a, ct_b)
+
+    // Fresh acceptance marker after signature verification.
+    generates responder_accept_marker
+    responder_accepted = HASH(responder_accept_marker)
+]
+
+A -> Sink: [responder_accepted]
+
+principal Sink[
+    use_responder_accepted = HASH(responder_accepted)
+]
+
+queries[
+    confidentiality? ss
+
+    authentication? B -> A: ct_b[
+        precondition[A -> Sink: responder_accepted]
+    ]
+]

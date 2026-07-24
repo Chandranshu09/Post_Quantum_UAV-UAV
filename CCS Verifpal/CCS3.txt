@@ -1,0 +1,94 @@
+attacker[active]
+
+// ============================================================
+// Model 3:
+// Transcript-bound HKDF secrecy and key agreement.
+//
+// Inputs established by Models 1 and 2:
+//
+// - sid0 is bound to the initial session context;
+// - m2_ref is A's authenticated M2 context;
+// - m3_ref is B's authenticated M3^0 context;
+// - ss is the confidential ML-KEM shared secret recovered
+//   by both parties.
+//
+// This model does not repeat LM-OTS or ML-KEM operations.
+// It verifies the subsequent transcript and KDF composition.
+// ============================================================
+
+principal A[
+    knows public transcript_tag
+    knows public uav_ake_tag
+
+    // Shared ML-KEM output established in Models 1 and 2.
+    knows private ss
+
+    // Accepted authenticated protocol contexts.
+    knows public sid0
+    knows public m2_ref
+    knows public m3_ref
+
+    // Compact abstraction of:
+    //
+    // T = H(Enc(TRANSCRIPT,
+    //     SID0, M0, M1, M2, M3^0))
+    //
+    // M0 and M1 are already transitively bound through SID0.
+    transcript_a = HASH(
+        transcript_tag,
+        sid0,
+        m2_ref,
+        m3_ref
+    )
+
+    // Symbolic abstraction of:
+    //
+    // PRK = HKDF-Extract(T, ss)
+    // SK || K_A^c || K_B^c =
+    //     HKDF-Expand(PRK, Enc(UAV-AKE,T), 96)
+    //
+    // Verifpal HKDF returns three independent outputs.
+    sk_a, kca_a, kcb_a =
+        HKDF(ss, transcript_a, uav_ake_tag)
+]
+
+principal B[
+    knows public transcript_tag
+    knows public uav_ake_tag
+
+    knows private ss
+
+    knows public sid0
+    knows public m2_ref
+    knows public m3_ref
+
+    // Independently reconstruct the accepted transcript.
+    transcript_b = HASH(
+        transcript_tag,
+        sid0,
+        m2_ref,
+        m3_ref
+    )
+
+    // Independently derive the three protocol keys.
+    sk_b, kca_b, kcb_b =
+        HKDF(ss, transcript_b, uav_ake_tag)
+]
+
+queries[
+    // ML-KEM shared-secret secrecy remains preserved.
+    confidentiality? ss
+
+    // Final session-key secrecy.
+    confidentiality? sk_a
+    confidentiality? sk_b
+
+    // Confirmation-key secrecy.
+    confidentiality? kca_a
+    confidentiality? kcb_a
+
+    // Both UAVs derive identical keys.
+    equivalence? sk_a, sk_b
+    equivalence? kca_a, kca_b
+    equivalence? kcb_a, kcb_b
+]

@@ -1,0 +1,69 @@
+attacker[active]
+
+// ============================================================
+// Model 4B:
+// Initiator key confirmation through tau_A.
+//
+// Inputs established by Model 3:
+// - transcript is the common authenticated transcript T;
+// - kca is the confidential initiator-confirmation key K_A^c.
+//
+// Model 4A already verified B-to-A confirmation through tau_B.
+// This model verifies the final A-to-B confirmation through tau_A.
+// ============================================================
+
+principal A[
+    knows public transcript
+    knows public aconfirm_tag
+
+    // Shared initiator-confirmation key derived from HKDF.
+    knows private kca
+
+    // Enc(A-CONFIRM, T) abstraction.
+    confirm_data_a = HASH(aconfirm_tag, transcript)
+
+    // tau_A = HMAC_{K_A^c}(Enc(A-CONFIRM, T))
+    tau_a = MAC(kca, confirm_data_a)
+]
+
+principal B[
+    knows public transcript
+    knows public aconfirm_tag
+
+    // Same HKDF-derived confirmation key.
+    knows private kca
+]
+
+principal Sink[
+    knows public sink_tag
+]
+
+// tau_a is public and attacker-mutable during transmission.
+A -> B: tau_a
+
+principal B[
+    // Independently reconstruct the expected confirmation tag.
+    confirm_data_b = HASH(aconfirm_tag, transcript)
+    tau_a_expected = MAC(kca, confirm_data_b)
+
+    // B completes the protocol only if tau_A verifies.
+    _ = ASSERT(tau_a, tau_a_expected)?
+
+    // Fresh completion marker generated only after verification.
+    generates initiator_marker
+    initiator_confirmed = HASH(initiator_marker)
+]
+
+B -> Sink: [initiator_confirmed]
+
+principal Sink[
+    use_initiator_confirmed = HASH(initiator_confirmed)
+]
+
+queries[
+    confidentiality? kca
+
+    authentication? A -> B: tau_a[
+        precondition[B -> Sink: initiator_confirmed]
+    ]
+]
