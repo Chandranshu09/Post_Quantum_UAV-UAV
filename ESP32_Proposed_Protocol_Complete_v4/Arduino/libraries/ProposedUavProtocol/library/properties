@@ -1,0 +1,9 @@
+name=ProposedUavProtocol
+version=4.0.0
+author=Research prototype
+maintainer=Research prototype
+sentence=Five-message direct post-quantum UAV-to-UAV authenticated key establishment.
+paragraph=ESP32 implementation with ML-KEM-512, RFC 8554 LM-OTS/LMS, transcript-bound mutual confirmation, crash-safe one-time index reservation, and repository-assisted or signer-carried LMS authentication paths.
+category=Communication
+architectures=esp32
+includes=ProposedUavProtocolAll.h
