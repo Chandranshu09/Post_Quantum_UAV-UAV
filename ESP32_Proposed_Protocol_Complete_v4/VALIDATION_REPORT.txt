@@ -1,0 +1,17 @@
+Validation completed in the artifact-generation environment
+
+Passed:
+- Python bytecode compilation for all Python utilities
+- packet-size, HMAC, SQLite, and source-invariant tests in tools/validate_package.py
+- host-side C++17 syntax checking of all library .cpp files using API stubs
+- host-side syntax checking of all four Arduino sketches
+
+Not performed here:
+- compilation against the user's installed ESP32 Arduino core
+- compilation against the user's exact wolfSSL configuration
+- upload or execution on physical ESP32-WROOM-DA boards
+- physical APUF or Python fuzzy-extractor integration
+- 500-session reruns of the revised v4 message/transcript formats
+
+The physical ESP32 build and both measured deployment-mode runs remain required
+before new latency, reliability, RAM, or success-rate values are reported.
