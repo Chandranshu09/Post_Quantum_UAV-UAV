@@ -1,0 +1,103 @@
+/*
+  UAV_B responder, deployment mode A: repository-assisted paths.
+
+  Before uploading:
+    1. Set WIFI_SSID, WIFI_PASSWORD, and GCS_IP.
+    2. Upload this sketch first and note the printed IP address for UAV_A.
+    3. Use RESET_Q_COUNTER=true only once for a newly provisioned LMS tree,
+       then immediately change it back to false and upload again.
+
+  The hardcoded PUF root and helper data are laboratory placeholders. Replace
+  only the PUF/FE hook later; the LMS, protocol, and measurement code remains.
+*/
+
+#include <Arduino.h>
+#include <ProposedUavProtocolAll.h>
+
+using namespace puav;
+
+static const char* WIFI_SSID = "YOUR_WIFI_NAME";
+static const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+static const IPAddress GCS_IP(192, 168, 29, 2);
+static const IPAddress RESPONDER_IP(0, 0, 0, 0);
+
+static constexpr bool RESET_Q_COUNTER = false;
+
+static const NodeConfig CONFIG = {
+    Role::Responder,
+    PathDeliveryMode::RepositoryAssisted,
+    WIFI_SSID,
+    WIFI_PASSWORD,
+    GCS_IP,
+    RESPONDER_IP,
+    DEFAULT_PROTOCOL_PORT,
+    DEFAULT_GCS_PORT,
+    5212,
+
+    /* deviceId */
+    {
+        0x42,0x42,0x42,0x42,0x42,0x42,0x42,0x42,
+        0x42,0x42,0x42,0x42,0x42,0x42,0x42,0x42,
+        0x42,0x42,0x42,0x42,0x42,0x42,0x42,0x42,
+        0x42,0x42,0x42,0x42,0x42,0x42,0x42,0x42
+    },
+
+    /* peerId */
+    {
+        0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,
+        0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,
+        0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,
+        0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41
+    },
+
+    /* Stable PUF-root placeholder, identical to the earlier ESP32 package. */
+    {
+        0x92,0x81,0x70,0x6f,0x5e,0x4d,0x3c,0x2b,
+        0x1a,0x09,0xf8,0xe7,0xd6,0xc5,0xb4,0xa3,
+        0x12,0x34,0x56,0x78,0x9a,0xbc,0xde,0xf0,
+        0x0f,0xed,0xcb,0xa9,0x87,0x65,0x43,0x21
+    },
+
+    /* Locally retained FE helper-data placeholder. It is never transmitted. */
+    {
+        0xc3,0x0e,0x59,0xa4,0x17,0x6b,0xd2,0x8d,
+        0x45,0xf1,0x2a,0x73,0xbe,0x08,0x94,0x61,
+        0xdf,0x35,0x80,0x1c,0x67,0xaa,0x49,0xf6,
+        0x20,0x9b,0x54,0xe7,0x0a,0x32,0xcd,0x78
+    },
+
+    /* Independent LMS identifier for this deployment profile/version. */
+    {
+        0xb1,0xb2,0xb3,0xb4,0xb5,0xb6,0xb7,0xb8,
+        0xb9,0xba,0xbb,0xbc,0xbd,0xbe,0xbf,0xc0
+    },
+
+    1,       /* credentialVersion */
+    1,       /* peerCredentialVersion */
+    0,               /* expiry disabled in laboratory runs */
+    "uavB_repo_v1",
+    0,               /* firstQ */
+    500,             /* measured sessions */
+    RESET_Q_COUNTER
+};
+
+static ProposedUavProtocol protocol(CONFIG);
+
+void setup()
+{
+    Serial.begin(115200);
+    delay(2000);
+
+    if (!protocol.begin()) {
+        Serial.println();
+        Serial.println("UAV_B initialization failed.");
+        while (true) {
+            delay(1000);
+        }
+    }
+}
+
+void loop()
+{
+    protocol.loop();
+}
