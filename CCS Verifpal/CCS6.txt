@@ -1,0 +1,102 @@
+attacker[active]
+
+// ============================================================
+// Model 6:
+// Binding of SID0 to both UAV identities, fresh nonces,
+// and the selected cryptographic suite.
+//
+// SID0 represents:
+//
+// M0 = Enc(REQ, ID_A, ID_B, N_A, SuiteID)
+//
+// M1 = Enc(CHAL,
+//          ID_B, ID_A, N_A, N_B, SuiteID)
+//
+// SID0 = H(Enc(SID0, M0, M1))
+//
+// The exact nested encodings are compacted into one context
+// hash. A's LM-OTS signature authenticates the resulting SID0.
+// ============================================================
+
+principal A[
+    knows public ida
+    knows public idb
+    knows public suiteid
+    knows public sid_tag
+
+    // Validated PUF-derived LM-OTS credential.
+    knows private sk_ots_a
+    pk_ots_a = G^sk_ots_a
+
+    // Fresh initiator nonce N_A.
+    generates na
+]
+
+principal B[
+    knows public ida
+    knows public idb
+    knows public suiteid
+    knows public sid_tag
+]
+
+principal Sink[
+    knows public sink_tag
+]
+
+// pk_ots_a has been authenticated through the ledger/LMS
+// certificate-validation layer.
+//
+// N_A remains attacker-mutable on the runtime channel.
+A -> B: [pk_ots_a], na
+
+principal B[
+    // Fresh responder nonce N_B.
+    generates nb
+]
+
+// N_B remains attacker-mutable on the runtime channel.
+B -> A: nb
+
+principal A[
+    // Compact representation of M0 and M1.
+    //
+    // Maximum HASH arity is five.
+    sid_ctx_a = HASH(ida, idb, na, nb, suiteid)
+
+    // SID0 = H(domain || context).
+    sid0_a = HASH(sid_tag, sid_ctx_a)
+
+    // LM-OTS abstraction of A's authenticated SID0 context.
+    sigma_sid = SIGN(sk_ots_a, sid0_a)
+]
+
+// The transmitted SID0 and signature remain attacker-mutable.
+A -> B: sid0_a, sigma_sid
+
+principal B[
+    // Independently reconstruct the expected session context.
+    sid_ctx_b = HASH(ida, idb, na, nb, suiteid)
+    sid0_b = HASH(sid_tag, sid_ctx_b)
+
+    // Authenticate the SID0 supplied by A.
+    _ = SIGNVERIF(pk_ots_a, sid0_a, sigma_sid)?
+
+    // Ensure it identifies B's current pending session.
+    _ = ASSERT(sid0_a, sid0_b)?
+
+    // Acceptance occurs only after signature and equality checks.
+    generates sid_marker
+    sid_accepted = HASH(sid_marker)
+]
+
+B -> Sink: [sid_accepted]
+
+principal Sink[
+    use_sid_accepted = HASH(sid_accepted)
+]
+
+queries[
+    authentication? A -> B: sid0_a[
+        precondition[B -> Sink: sid_accepted]
+    ]
+]
